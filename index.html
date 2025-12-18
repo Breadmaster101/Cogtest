@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COGTEST</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;900&family=JetBrains+Mono:wght@300;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #08080a;
+            --bg-panel: #111114;
+            --primary: #ffffff;
+            --accent: #00f2ff;
+            --accent-dim: rgba(0, 242, 255, 0.1);
+            --danger: #ff2a2a;
+            --success: #00ff88;
+            --text-muted: #555;
+            --font-display: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--primary);
+            font-family: var(--font-display);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* --- Full Screen Menu Layout --- */
+        #menu-view {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .menu-panel {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            position: relative;
+            border-right: 1px solid #222;
+        }
+        
+        .menu-panel:last-child { border-right: none; }
+
+        .menu-panel:hover {
+            flex: 1.5;
+            background: var(--accent-dim);
+        }
+        
+        .menu-panel:hover h2 { color: var(--accent); transform: scale(1.1); }
+        .menu-panel:hover .panel-icon { transform: scale(1.2) rotate(-5deg); opacity: 1; }
+
+        .panel-content { text-align: center; z-index: 2; pointer-events: none; }
+        
+        .panel-icon {
+            font-size: 8rem;
+            margin-bottom: 2rem;
+            opacity: 0.3;
+            transition: all 0.4s ease;
+        }
+
+        h2 {
+            font-size: 4rem;
+            text-transform: uppercase;
+            font-weight: 900;
+            letter-spacing: -2px;
+            transition: color 0.3s;
+        }
+
+        p {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            margin-top: 1rem;
+            letter-spacing: 1px;
+        }
+
+        /* --- Game Container (Overlay) --- */
+        #game-layer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            z-index: 10;
+        }
+
+        #game-layer.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: scale(1);
+        }
+
+        /* --- Universal HUD Elements --- */
+        .hud-top {
+            position: absolute;
+            top: 40px;
+            width: 100%;
+            text-align: center;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        .hud-bottom {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+
+        .key-badge {
+            border: 1px solid #444;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 4px;
+            color: #fff;
+            display: inline-block;
+        }
+
+        /* --- Typography for Games --- */
+        .hero-text {
+            font-family: var(--font-mono);
+            font-size: 12vw; /* Massive scaling text */
+            font-weight: 700;
+            line-height: 1;
+            margin: 0;
+            transition: color 0.1s;
+        }
+
+        .sub-text {
+            font-size: 1.5rem;
+            margin-top: 2rem;
+            color: var(--text-muted);
+        }
+
+        /* --- Reflex Game Specifics --- */
+        #game-layer.reflex-waiting { background-color: #1a0a0a; cursor: none; }
+        
+        #game-layer.reflex-go { 
+            background-color: var(--success); 
+            cursor: pointer; 
+            /* Disable transition for instant visual stimulus */
+            transition: none; 
+        }
+        
+        #game-layer.reflex-fail { background-color: var(--danger); }
+        
+        /* UPDATED: Added transition: none to ensure text turns black instantly */
+        #game-layer.reflex-go .hero-text { 
+            color: #000; 
+            transition: none;
+        }
+        
+        #game-layer.reflex-go .sub-text { color: #000; opacity: 0.7; }
+
+        /* --- Focus Game Specifics --- */
+        #game-layer.focus-hit .hero-text { color: var(--success); text-shadow: 0 0 30px var(--success); }
+        #game-layer.focus-miss .hero-text { color: var(--danger); text-shadow: 0 0 30px var(--danger); }
+
+        /* --- Utility Classes --- */
+        .hidden { display: none !important; }
+        .text-accent { color: var(--accent); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
+
+    </style>
+</head>
+<body>
+
+    <div id="menu-view">
+        <div class="menu-panel" onclick="app.loadGame('perception')">
+            <div class="panel-content">
+                <div class="panel-icon">⏳</div>
+                <h2>Chrono</h2>
+                <p>INTERNAL CLOCK</p>
+            </div>
+        </div>
+        <div class="menu-panel" onclick="app.loadGame('reflex')">
+            <div class="panel-content">
+                <div class="panel-icon">⚡</div>
+                <h2>Reflex</h2>
+                <p>REACTION SPEED</p>
+            </div>
+        </div>
+        <div class="menu-panel" onclick="app.loadGame('focus')">
+            <div class="panel-content">
+                <div class="panel-icon">👁️</div>
+                <h2>Signal</h2>
+                <p>PATTERN MATCH</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-layer">
+        
+        <div class="hud-top">
+            <span id="game-title-display">GAME NAME</span>
+        </div>
+
+        <div id="game-content">
+            <h1 id="main-display" class="hero-text">0.00</h1>
+            <div id="sub-display" class="sub-text">Press Space</div>
+        </div>
+
+        <div class="hud-bottom">
+            <span id="control-hint">Press <span class="key-badge">SPACE</span> to Action</span> • Press <span class="key-badge">ESC</span> to Menu
+        </div>
+
+    </div>
+
+<script>
+    /* --- CORE APP NAVIGATION --- */
+    const app = {
+        currentContext: 'menu',
+        gameLayer: document.getElementById('game-layer'),
+        titleDisplay: document.getElementById('game-title-display'),
+        mainDisplay: document.getElementById('main-display'),
+        subDisplay: document.getElementById('sub-display'),
+        controlHint: document.getElementById('control-hint'),
+        
+        loadGame: function(gameType) {
+            this.currentContext = gameType;
+            this.gameLayer.classList.add('active');
+            
+            // Clear previous states
+            this.gameLayer.className = 'active'; 
+            this.mainDisplay.style.color = '';
+            this.mainDisplay.style.textShadow = '';
+
+            if (gameType === 'perception') {
+                this.titleDisplay.innerText = "Chrono Sense // Stop on Target";
+                this.controlHint.innerHTML = `Use <span class="key-badge">↑</span> <span class="key-badge">↓</span> to Adjust Time • <span class="key-badge">SPACE</span> to Start`;
+                perceptionGame.init();
+            } else if (gameType === 'reflex') {
+                this.titleDisplay.innerText = "Reflex Strike // Wait for Green";
+                this.controlHint.innerHTML = `Press <span class="key-badge">SPACE</span> to Action`;
+                reflexGame.init();
+            } else if (gameType === 'focus') {
+                this.titleDisplay.innerText = "Signal Noise // Identify Target";
+                this.controlHint.innerHTML = `Press <span class="key-badge">SPACE</span> on Match`;
+                focusGame.init();
+            }
+        },
+
+        goHome: function() {
+            // Stop any running timers
+            clearTimeout(reflexGame.timeoutId);
+            clearInterval(perceptionGame.timerInterval);
+            clearTimeout(focusGame.intervalId);
+            
+            this.gameLayer.classList.remove('active');
+            // Slight delay to allow transition before resetting context
+            setTimeout(() => {
+                this.currentContext = 'menu';
+                this.gameLayer.className = ''; // Reset background colors
+            }, 300);
+        }
+    };
+
+    /* --- GLOBAL INPUTS --- */
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape') {
+            app.goHome();
+            return;
+        }
+
+        // Action Input
+        if (e.code === 'Space') {
+            e.preventDefault(); // Stop scrolling
+            if (app.currentContext === 'perception') perceptionGame.action();
+            if (app.currentContext === 'reflex') reflexGame.action();
+            if (app.currentContext === 'focus') focusGame.action();
+        }
+
+        // Time Adjustment Inputs (Only for Perception Game)
+        if (app.currentContext === 'perception') {
+            if (e.code === 'ArrowUp' || e.code === 'ArrowRight') {
+                e.preventDefault();
+                perceptionGame.adjustTime(1);
+            }
+            if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') {
+                e.preventDefault();
+                perceptionGame.adjustTime(-1);
+            }
+        }
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        if (app.currentContext === 'reflex') reflexGame.action();
+        if (app.currentContext === 'focus') focusGame.action();
+    });
+
+    /* --- GAME 1: PERCEPTION (Full Screen Logic) --- */
+    const perceptionGame = {
+        state: 'idle', 
+        startTime: 0,
+        targetTime: 0,
+        selectedSeconds: 5, // Default time
+        
+        init: function() {
+            this.selectedSeconds = 5; // Reset to default on load
+            this.reset();
+        },
+
+        reset: function() {
+            this.state = 'idle';
+            this.targetTime = this.selectedSeconds * 1000;
+            
+            app.mainDisplay.innerText = this.selectedSeconds + ".00";
+            app.mainDisplay.style.opacity = "1";
+            app.mainDisplay.style.color = "var(--primary)";
+            app.subDisplay.innerHTML = "Target Time";
+        },
+
+        adjustTime: function(delta) {
+            if (this.state !== 'idle') return; // Only allow adjustment before start
+            
+            this.selectedSeconds += delta;
+            
+            // Clamp values (Min 1s, Max 60s)
+            if (this.selectedSeconds < 1) this.selectedSeconds = 1;
+            if (this.selectedSeconds > 60) this.selectedSeconds = 60;
+
+            this.reset(); // Update display
+        },
+
+        action: function() {
+            if (this.state === 'idle') this.start();
+            else if (this.state === 'running') this.stop();
+            else this.reset();
+        },
+
+        start: function() {
+            this.state = 'running';
+            this.startTime = Date.now();
+            
+            app.mainDisplay.style.opacity = "0.1"; // Dim the target
+            app.subDisplay.innerText = "Counting...";
+        },
+
+        stop: function() {
+            this.state = 'ended';
+            const elapsed = Date.now() - this.startTime;
+            const diff = elapsed - this.targetTime;
+            
+            const elapsedSec = (elapsed / 1000).toFixed(3);
+            const diffSec = (diff / 1000).toFixed(3);
+            const sign = diff > 0 ? "+" : "";
+
+            // Visual Feedback
+            app.mainDisplay.style.opacity = "1";
+            app.mainDisplay.innerText = elapsedSec;
+            
+            let color = "var(--danger)";
+            let msg = "Way off";
+            
+            if (Math.abs(diff) < 200) { color = "var(--success)"; msg = "Perfect"; }
+            else if (Math.abs(diff) < 500) { color = "var(--accent)"; msg = "Close"; }
+            
+            app.mainDisplay.style.color = color;
+            app.subDisplay.innerHTML = `${msg} <span style="color:${color}">(${sign}${diffSec}s)</span> <br><br> Space to Retry`;
+        }
+    };
+
+    /* --- GAME 2: REFLEX (Full Screen Logic) --- */
+    const reflexGame = {
+        state: 'idle',
+        timeoutId: null,
+        startTime: 0,
+
+        init: function() {
+            this.state = 'idle';
+            app.gameLayer.className = 'active'; // Reset bg
+            app.mainDisplay.innerText = "READY?";
+            app.mainDisplay.style.fontSize = "12vw";
+            app.subDisplay.innerText = "Press Space to start sequence";
+        },
+
+        action: function() {
+            if (this.state === 'idle') this.startWait();
+            else if (this.state === 'waiting') this.fail();
+            else if (this.state === 'ready') this.success();
+            else if (this.state === 'result') this.init();
+        },
+
+        startWait: function() {
+            this.state = 'waiting';
+            app.gameLayer.classList.add('reflex-waiting');
+            app.mainDisplay.innerText = "WAIT";
+            app.subDisplay.innerText = "Steady...";
+            
+            const delay = Math.floor(Math.random() * 3000) + 2000;
+            this.timeoutId = setTimeout(() => this.go(), delay);
+        },
+
+        fail: function() {
+            clearTimeout(this.timeoutId);
+            this.state = 'result';
+            app.gameLayer.className = 'active reflex-fail';
+            app.mainDisplay.innerText = "TOO EARLY";
+            app.subDisplay.innerText = "Space to retry";
+        },
+
+        go: function() {
+            this.state = 'ready';
+            this.startTime = Date.now();
+            app.gameLayer.className = 'active reflex-go';
+            app.mainDisplay.innerText = "CLICK!";
+            app.subDisplay.innerText = "";
+        },
+
+        success: function() {
+            const time = Date.now() - this.startTime;
+            this.state = 'result';
+            app.gameLayer.className = 'active'; // clear green bg
+            
+            app.mainDisplay.innerText = time + "ms";
+            
+            let rank = "Average";
+            if (time < 200) rank = "Cybernetic";
+            else if (time < 250) rank = "Pro Gamer";
+            
+            app.subDisplay.innerHTML = `Rank: <span class="text-accent">${rank}</span><br><br>Space to Retry`;
+        }
+    };
+
+    /* --- GAME 3: SIGNAL/FOCUS (Pattern Recognition) --- */
+    const focusGame = {
+        state: 'idle', 
+        intervalId: null,
+        targetSymbol: '',
+        chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        currentSymbol: '',
+        integrity: 1, 
+        score: 0,
+        speed: 800, // Starting speed (ms)
+        lastWasTarget: false,
+        clickedThisTurn: false,
+
+        init: function() {
+            this.state = 'idle';
+            this.integrity = 1; 
+            this.score = 0;
+            this.speed = 800;
+            this.lastWasTarget = false;
+            this.currentSymbol = ''; // Reset current symbol
+            
+            this.targetSymbol = this.chars[Math.floor(Math.random() * this.chars.length)];
+            
+            app.gameLayer.className = 'active'; 
+            app.mainDisplay.innerText = `[ ${this.targetSymbol} ]`;
+            app.mainDisplay.style.color = "var(--accent)";
+            app.subDisplay.innerText = "Press Space only on TARGET";
+        },
+
+        action: function() {
+            if (this.state === 'idle') this.start();
+            else if (this.state === 'running') this.checkInput();
+            else if (this.state === 'ended') this.init();
+        },
+
+        start: function() {
+            this.state = 'running';
+            this.nextTurn();
+        },
+
+        nextTurn: function() {
+            // Miss check
+            if (this.lastWasTarget && !this.clickedThisTurn) {
+                this.damage('MISS');
+                if (this.state === 'ended') return;
+            }
+
+            this.clickedThisTurn = false;
+            
+            // --- NEW LOGIC START ---
+            
+            // Store previous symbol to check for repeats
+            const previousSymbol = this.currentSymbol;
+
+            // Determine if we want to show a target
+            let isTarget = Math.random() < 0.25;
+
+            // REPETITION GUARD: If we rolled Target, but the last symbol WAS the target,
+            // we must force it to be a distractor instead.
+            if (isTarget && previousSymbol === this.targetSymbol) {
+                isTarget = false; 
+            }
+
+            this.lastWasTarget = isTarget;
+            
+            if (isTarget) {
+                this.currentSymbol = this.targetSymbol;
+            } else {
+                // Pick a distractor
+                let char;
+                do {
+                    char = this.chars[Math.floor(Math.random() * this.chars.length)];
+                } while (
+                    char === this.targetSymbol || // Must not be the target
+                    char === previousSymbol       // Must not be the same as last turn
+                );
+                this.currentSymbol = char;
+            }
+            
+            // --- NEW LOGIC END ---
+
+            app.mainDisplay.innerText = this.currentSymbol;
+            app.mainDisplay.style.color = "var(--primary)";
+            app.gameLayer.className = 'active'; 
+            
+            app.subDisplay.innerText = `SCORE: ${this.score}`;
+
+            // UPDATED: Dynamic speed increase per score
+            // Reduces delay by 15ms per point, minimum of 250ms
+            const currentSpeed = Math.max(250, this.speed - (this.score * 15));
+            
+            this.intervalId = setTimeout(() => this.nextTurn(), currentSpeed);
+        },
+
+        checkInput: function() {
+            if (this.clickedThisTurn) return;
+            this.clickedThisTurn = true;
+
+            if (this.currentSymbol === this.targetSymbol) {
+                this.score++;
+                app.gameLayer.classList.add('focus-hit');
+                app.subDisplay.innerText = `SCORE: ${this.score}`;
+            } else {
+                this.damage('FALSE');
+            }
+        },
+
+        damage: function(reason) {
+            this.integrity--;
+            app.gameLayer.classList.add('focus-miss');
+            app.subDisplay.innerText = `${reason}!`;
+
+            if (this.integrity <= 0) {
+                this.endGame();
+            }
+        },
+
+        endGame: function() {
+            this.state = 'ended';
+            clearTimeout(this.intervalId);
+            app.gameLayer.className = 'active reflex-fail';
+            app.mainDisplay.innerText = "LOST";
+            app.subDisplay.innerHTML = `Final Score: <span class="text-primary">${this.score}</span><br><br>Space to Retry`;
+        }
+    };
+</script>
+
+</body>
+</html>
