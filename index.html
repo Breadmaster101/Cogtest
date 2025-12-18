@@ -172,7 +172,6 @@
         
         #game-layer.reflex-fail { background-color: var(--danger); }
         
-        /* UPDATED: Added transition: none to ensure text turns black instantly */
         #game-layer.reflex-go .hero-text { 
             color: #000; 
             transition: none;
@@ -253,6 +252,8 @@
             this.gameLayer.className = 'active'; 
             this.mainDisplay.style.color = '';
             this.mainDisplay.style.textShadow = '';
+            // FIX: Reset opacity to ensure Chrono game dimming doesn't leak
+            this.mainDisplay.style.opacity = ''; 
 
             if (gameType === 'perception') {
                 this.titleDisplay.innerText = "Chrono Sense // Stop on Target";
@@ -272,7 +273,7 @@
         goHome: function() {
             // Stop any running timers
             clearTimeout(reflexGame.timeoutId);
-            clearInterval(perceptionGame.timerInterval);
+            // FIX: perceptionGame does not use an interval, removed dead code
             clearTimeout(focusGame.intervalId);
             
             this.gameLayer.classList.remove('active');
@@ -463,6 +464,7 @@
         speed: 800, // Starting speed (ms)
         lastWasTarget: false,
         clickedThisTurn: false,
+        isFirstTurn: false, // New flag to handle input buffering
 
         init: function() {
             this.state = 'idle';
@@ -470,7 +472,7 @@
             this.score = 0;
             this.speed = 800;
             this.lastWasTarget = false;
-            this.currentSymbol = ''; // Reset current symbol
+            this.currentSymbol = ''; 
             
             this.targetSymbol = this.chars[Math.floor(Math.random() * this.chars.length)];
             
@@ -488,10 +490,14 @@
 
         start: function() {
             this.state = 'running';
+            this.isFirstTurn = true; // Flag the start
             this.nextTurn();
         },
 
         nextTurn: function() {
+            // FIX: Reset classes at the start. If damage() triggers later, the red class stays.
+            app.gameLayer.className = 'active';
+
             // Miss check
             if (this.lastWasTarget && !this.clickedThisTurn) {
                 this.damage('MISS');
@@ -502,14 +508,16 @@
             
             // --- NEW LOGIC START ---
             
-            // Store previous symbol to check for repeats
             const previousSymbol = this.currentSymbol;
-
-            // Determine if we want to show a target
             let isTarget = Math.random() < 0.25;
 
-            // REPETITION GUARD: If we rolled Target, but the last symbol WAS the target,
-            // we must force it to be a distractor instead.
+            // FIX: Force first turn to be a distractor to avoid click-through from start menu
+            if (this.isFirstTurn) {
+                isTarget = false;
+                this.isFirstTurn = false;
+            }
+
+            // REPETITION GUARD
             if (isTarget && previousSymbol === this.targetSymbol) {
                 isTarget = false; 
             }
@@ -519,13 +527,12 @@
             if (isTarget) {
                 this.currentSymbol = this.targetSymbol;
             } else {
-                // Pick a distractor
                 let char;
                 do {
                     char = this.chars[Math.floor(Math.random() * this.chars.length)];
                 } while (
-                    char === this.targetSymbol || // Must not be the target
-                    char === previousSymbol       // Must not be the same as last turn
+                    char === this.targetSymbol || 
+                    char === previousSymbol       
                 );
                 this.currentSymbol = char;
             }
@@ -534,12 +541,10 @@
 
             app.mainDisplay.innerText = this.currentSymbol;
             app.mainDisplay.style.color = "var(--primary)";
-            app.gameLayer.className = 'active'; 
             
             app.subDisplay.innerText = `SCORE: ${this.score}`;
 
-            // UPDATED: Dynamic speed increase per score
-            // Reduces delay by 15ms per point, minimum of 250ms
+            // Dynamic speed increase
             const currentSpeed = Math.max(250, this.speed - (this.score * 15));
             
             this.intervalId = setTimeout(() => this.nextTurn(), currentSpeed);
