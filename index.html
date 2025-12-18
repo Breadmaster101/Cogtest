@@ -17,6 +17,7 @@
             --accent-dim: rgba(0, 242, 255, 0.1);
             --danger: #ff2a2a;
             --success: #00ff88;
+            --warning: #ffdd00;
             --text-muted: #555;
             --font-display: 'Inter', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
@@ -33,7 +34,6 @@
             overflow: hidden;
         }
 
-        /* --- Full Screen Menu Layout --- */
         #menu-view {
             display: flex;
             width: 100%;
@@ -67,14 +67,14 @@
         .panel-content { text-align: center; z-index: 2; pointer-events: none; }
         
         .panel-icon {
-            font-size: 8rem;
+            font-size: 6rem;
             margin-bottom: 2rem;
             opacity: 0.3;
             transition: all 0.4s ease;
         }
 
         h2 {
-            font-size: 4rem;
+            font-size: 3rem;
             text-transform: uppercase;
             font-weight: 900;
             letter-spacing: -2px;
@@ -86,9 +86,9 @@
             color: var(--text-muted);
             margin-top: 1rem;
             letter-spacing: 1px;
+            font-size: 0.8rem;
         }
 
-        /* --- Game Container (Overlay) --- */
         #game-layer {
             position: fixed;
             top: 0; left: 0;
@@ -111,7 +111,6 @@
             transform: scale(1);
         }
 
-        /* --- Universal HUD Elements --- */
         .hud-top {
             position: absolute;
             top: 40px;
@@ -144,10 +143,9 @@
             display: inline-block;
         }
 
-        /* --- Typography for Games --- */
         .hero-text {
             font-family: var(--font-mono);
-            font-size: 12vw; /* Massive scaling text */
+            font-size: 12vw; 
             font-weight: 700;
             line-height: 1;
             margin: 0;
@@ -160,30 +158,20 @@
             color: var(--text-muted);
         }
 
-        /* --- Reflex Game Specifics --- */
         #game-layer.reflex-waiting { background-color: #1a0a0a; cursor: none; }
-        
-        #game-layer.reflex-go { 
-            background-color: var(--success); 
-            cursor: pointer; 
-            /* Disable transition for instant visual stimulus */
-            transition: none; 
-        }
-        
+        #game-layer.reflex-go { background-color: var(--success); cursor: pointer; transition: none; }
         #game-layer.reflex-fail { background-color: var(--danger); }
-        
-        #game-layer.reflex-go .hero-text { 
-            color: #000; 
-            transition: none;
-        }
-        
+        #game-layer.reflex-go .hero-text { color: #000; transition: none; }
         #game-layer.reflex-go .sub-text { color: #000; opacity: 0.7; }
 
-        /* --- Focus Game Specifics --- */
         #game-layer.focus-hit .hero-text { color: var(--success); text-shadow: 0 0 30px var(--success); }
         #game-layer.focus-miss .hero-text { color: var(--danger); text-shadow: 0 0 30px var(--danger); }
 
-        /* --- Utility Classes --- */
+        .c-red { color: var(--danger) !important; }
+        .c-green { color: var(--success) !important; }
+        .c-blue { color: #4488ff !important; } 
+        .c-yellow { color: var(--warning) !important; }
+        
         .hidden { display: none !important; }
         .text-accent { color: var(--accent); }
         .text-success { color: var(--success); }
@@ -215,6 +203,13 @@
                 <p>PATTERN MATCH</p>
             </div>
         </div>
+        <div class="menu-panel" onclick="app.loadGame('conflict')">
+            <div class="panel-content">
+                <div class="panel-icon">🧠</div>
+                <h2>Conflict</h2>
+                <p>INHIBITION</p>
+            </div>
+        </div>
     </div>
 
     <div id="game-layer">
@@ -235,7 +230,6 @@
     </div>
 
 <script>
-    /* --- CORE APP NAVIGATION --- */
     const app = {
         currentContext: 'menu',
         gameLayer: document.getElementById('game-layer'),
@@ -248,12 +242,11 @@
             this.currentContext = gameType;
             this.gameLayer.classList.add('active');
             
-            // Clear previous states
             this.gameLayer.className = 'active'; 
             this.mainDisplay.style.color = '';
             this.mainDisplay.style.textShadow = '';
-            // FIX: Reset opacity to ensure Chrono game dimming doesn't leak
             this.mainDisplay.style.opacity = ''; 
+            this.mainDisplay.className = 'hero-text';
 
             if (gameType === 'perception') {
                 this.titleDisplay.innerText = "Chrono";
@@ -267,73 +260,89 @@
                 this.titleDisplay.innerText = "Signal";
                 this.controlHint.innerHTML = `Press <span class="key-badge">SPACE</span> on Match`;
                 focusGame.init();
+            } else if (gameType === 'conflict') {
+                this.titleDisplay.innerText = "Conflict";
+                this.controlHint.innerHTML = `<span class="key-badge">←</span> NO • <span class="key-badge">→</span> YES • <span class="key-badge">SPACE</span> to Start`;
+                conflictGame.init();
             }
         },
 
         goHome: function() {
-            // Stop any running timers
+            this.currentContext = null;
+
             clearTimeout(reflexGame.timeoutId);
-            // FIX: perceptionGame does not use an interval, removed dead code
             clearTimeout(focusGame.intervalId);
+            clearInterval(conflictGame.timerInterval);
             
+            focusGame.state = 'idle';
+            reflexGame.state = 'idle';
+            conflictGame.state = 'idle';
+
             this.gameLayer.classList.remove('active');
-            // Slight delay to allow transition before resetting context
+            
             setTimeout(() => {
                 this.currentContext = 'menu';
-                this.gameLayer.className = ''; // Reset background colors
+                this.gameLayer.className = ''; 
             }, 300);
         }
     };
 
-    /* --- GLOBAL INPUTS --- */
     document.addEventListener('keydown', (e) => {
+        if (app.currentContext === null) return;
+
         if (e.code === 'Escape') {
             app.goHome();
             return;
         }
 
-        // Action Input
         if (e.code === 'Space') {
-            e.preventDefault(); // Stop scrolling
+            e.preventDefault(); 
             if (app.currentContext === 'perception') perceptionGame.action();
             if (app.currentContext === 'reflex') reflexGame.action();
             if (app.currentContext === 'focus') focusGame.action();
+            if (app.currentContext === 'conflict') conflictGame.action();
         }
 
-        // Time Adjustment Inputs (Only for Perception Game)
-        if (app.currentContext === 'perception') {
-            if (e.code === 'ArrowUp' || e.code === 'ArrowRight') {
-                e.preventDefault();
-                perceptionGame.adjustTime(1);
-            }
-            if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') {
-                e.preventDefault();
-                perceptionGame.adjustTime(-1);
-            }
+        if (e.code === 'ArrowUp') {
+            e.preventDefault();
+            if (app.currentContext === 'perception') perceptionGame.adjustTime(1);
+        }
+        if (e.code === 'ArrowDown') {
+            e.preventDefault();
+            if (app.currentContext === 'perception') perceptionGame.adjustTime(-1);
+        }
+        if (e.code === 'ArrowLeft') {
+            e.preventDefault();
+            if (app.currentContext === 'perception') perceptionGame.adjustTime(-1);
+            if (app.currentContext === 'conflict') conflictGame.input(false);
+        }
+        if (e.code === 'ArrowRight') {
+            e.preventDefault();
+            if (app.currentContext === 'perception') perceptionGame.adjustTime(1);
+            if (app.currentContext === 'conflict') conflictGame.input(true);
         }
     });
 
     document.addEventListener('mousedown', (e) => {
+        if (app.currentContext === null) return;
         if (app.currentContext === 'reflex') reflexGame.action();
         if (app.currentContext === 'focus') focusGame.action();
     });
 
-    /* --- GAME 1: PERCEPTION (Full Screen Logic) --- */
     const perceptionGame = {
         state: 'idle', 
         startTime: 0,
         targetTime: 0,
-        selectedSeconds: 5, // Default time
+        selectedSeconds: 5,
         
         init: function() {
-            this.selectedSeconds = 5; // Reset to default on load
+            this.selectedSeconds = 5; 
             this.reset();
         },
 
         reset: function() {
             this.state = 'idle';
             this.targetTime = this.selectedSeconds * 1000;
-            
             app.mainDisplay.innerText = this.selectedSeconds + ".00";
             app.mainDisplay.style.opacity = "1";
             app.mainDisplay.style.color = "var(--primary)";
@@ -341,15 +350,11 @@
         },
 
         adjustTime: function(delta) {
-            if (this.state !== 'idle') return; // Only allow adjustment before start
-            
+            if (this.state !== 'idle') return;
             this.selectedSeconds += delta;
-            
-            // Clamp values (Min 1s, Max 60s)
             if (this.selectedSeconds < 1) this.selectedSeconds = 1;
             if (this.selectedSeconds > 60) this.selectedSeconds = 60;
-
-            this.reset(); // Update display
+            this.reset(); 
         },
 
         action: function() {
@@ -361,8 +366,7 @@
         start: function() {
             this.state = 'running';
             this.startTime = Date.now();
-            
-            app.mainDisplay.style.opacity = "0.1"; // Dim the target
+            app.mainDisplay.style.opacity = "0.1"; 
             app.subDisplay.innerText = "Counting...";
         },
 
@@ -370,18 +374,15 @@
             this.state = 'ended';
             const elapsed = Date.now() - this.startTime;
             const diff = elapsed - this.targetTime;
-            
             const elapsedSec = (elapsed / 1000).toFixed(3);
             const diffSec = (diff / 1000).toFixed(3);
             const sign = diff > 0 ? "+" : "";
 
-            // Visual Feedback
             app.mainDisplay.style.opacity = "1";
             app.mainDisplay.innerText = elapsedSec;
             
             let color = "var(--danger)";
             let msg = "Way off";
-            
             if (Math.abs(diff) < 200) { color = "var(--success)"; msg = "Perfect"; }
             else if (Math.abs(diff) < 500) { color = "var(--accent)"; msg = "Close"; }
             
@@ -390,7 +391,6 @@
         }
     };
 
-    /* --- GAME 2: REFLEX (Full Screen Logic) --- */
     const reflexGame = {
         state: 'idle',
         timeoutId: null,
@@ -398,7 +398,7 @@
 
         init: function() {
             this.state = 'idle';
-            app.gameLayer.className = 'active'; // Reset bg
+            app.gameLayer.className = 'active'; 
             app.mainDisplay.innerText = "READY?";
             app.mainDisplay.style.fontSize = "12vw";
             app.subDisplay.innerText = "Press Space to start sequence";
@@ -416,9 +416,10 @@
             app.gameLayer.classList.add('reflex-waiting');
             app.mainDisplay.innerText = "WAIT";
             app.subDisplay.innerText = "Steady...";
-            
             const delay = Math.floor(Math.random() * 3000) + 2000;
-            this.timeoutId = setTimeout(() => this.go(), delay);
+            this.timeoutId = setTimeout(() => {
+                if(this.state === 'waiting') this.go(); 
+            }, delay);
         },
 
         fail: function() {
@@ -440,19 +441,15 @@
         success: function() {
             const time = Date.now() - this.startTime;
             this.state = 'result';
-            app.gameLayer.className = 'active'; // clear green bg
-            
+            app.gameLayer.className = 'active'; 
             app.mainDisplay.innerText = time + "ms";
-            
             let rank = "Average";
             if (time < 200) rank = "Cybernetic";
             else if (time < 250) rank = "Pro Gamer";
-            
             app.subDisplay.innerHTML = `Rank: <span class="text-accent">${rank}</span><br><br>Space to Retry`;
         }
     };
 
-    /* --- GAME 3: SIGNAL/FOCUS (Pattern Recognition) --- */
     const focusGame = {
         state: 'idle', 
         intervalId: null,
@@ -461,10 +458,10 @@
         currentSymbol: '',
         integrity: 1, 
         score: 0,
-        speed: 800, // Starting speed (ms)
+        speed: 800,
         lastWasTarget: false,
         clickedThisTurn: false,
-        isFirstTurn: false, // New flag to handle input buffering
+        isFirstTurn: false, 
 
         init: function() {
             this.state = 'idle';
@@ -473,7 +470,6 @@
             this.speed = 800;
             this.lastWasTarget = false;
             this.currentSymbol = ''; 
-            
             this.targetSymbol = this.chars[Math.floor(Math.random() * this.chars.length)];
             
             app.gameLayer.className = 'active'; 
@@ -490,34 +486,28 @@
 
         start: function() {
             this.state = 'running';
-            this.isFirstTurn = true; // Flag the start
+            this.isFirstTurn = true; 
             this.nextTurn();
         },
 
         nextTurn: function() {
-            // FIX: Reset classes at the start. If damage() triggers later, the red class stays.
+            if (this.state !== 'running') return;
+
             app.gameLayer.className = 'active';
 
-            // Miss check
             if (this.lastWasTarget && !this.clickedThisTurn) {
                 this.damage('MISS');
                 if (this.state === 'ended') return;
             }
 
             this.clickedThisTurn = false;
-            
-            // --- NEW LOGIC START ---
-            
             const previousSymbol = this.currentSymbol;
             let isTarget = Math.random() < 0.25;
 
-            // FIX: Force first turn to be a distractor to avoid click-through from start menu
             if (this.isFirstTurn) {
                 isTarget = false;
                 this.isFirstTurn = false;
             }
-
-            // REPETITION GUARD
             if (isTarget && previousSymbol === this.targetSymbol) {
                 isTarget = false; 
             }
@@ -530,23 +520,15 @@
                 let char;
                 do {
                     char = this.chars[Math.floor(Math.random() * this.chars.length)];
-                } while (
-                    char === this.targetSymbol || 
-                    char === previousSymbol       
-                );
+                } while (char === this.targetSymbol || char === previousSymbol);
                 this.currentSymbol = char;
             }
-            
-            // --- NEW LOGIC END ---
 
             app.mainDisplay.innerText = this.currentSymbol;
             app.mainDisplay.style.color = "var(--primary)";
-            
             app.subDisplay.innerText = `SCORE: ${this.score}`;
 
-            // Dynamic speed increase
             const currentSpeed = Math.max(250, this.speed - (this.score * 15));
-            
             this.intervalId = setTimeout(() => this.nextTurn(), currentSpeed);
         },
 
@@ -567,7 +549,6 @@
             this.integrity--;
             app.gameLayer.classList.add('focus-miss');
             app.subDisplay.innerText = `${reason}!`;
-
             if (this.integrity <= 0) {
                 this.endGame();
             }
@@ -578,7 +559,119 @@
             clearTimeout(this.intervalId);
             app.gameLayer.className = 'active reflex-fail';
             app.mainDisplay.innerText = "LOST";
-            app.subDisplay.innerHTML = `Final Score: <span class="text-primary">${this.score}</span><br><br>Space to Retry`;
+            app.subDisplay.innerHTML = `Space to Retry`;
+        }
+    };
+
+    const conflictGame = {
+        state: 'idle',
+        score: 0,
+        endTime: 0, 
+        timerInterval: null,
+        currentMatch: false, 
+        
+        colors: [
+            { name: 'RED', class: 'c-red' },
+            { name: 'GREEN', class: 'c-green' },
+            { name: 'BLUE', class: 'c-blue' },
+            { name: 'YELLOW', class: 'c-yellow' }
+        ],
+
+        init: function() {
+            this.state = 'idle';
+            this.score = 0;
+            
+            app.gameLayer.className = 'active';
+            app.mainDisplay.innerHTML = '<span class="text-accent">CONFLICT</span>';
+            app.mainDisplay.style.fontSize = "8vw";
+            app.subDisplay.innerText = "Does Text match Color?";
+        },
+
+        action: function() {
+            if (this.state === 'running') return; 
+
+            if (this.state === 'idle') {
+                this.startGame();
+            } else if (this.state === 'ended') {
+                this.init(); 
+            }
+        },
+
+        input: function(decision) {
+            if (this.state !== 'running') return;
+
+            if (decision === this.currentMatch) {
+                this.score++;
+                this.nextTurn();
+            } else {
+                this.endGame(true); 
+            }
+        },
+
+        startGame: function() {
+            this.state = 'running';
+            this.score = 0;
+            this.endTime = Date.now() + 30000; 
+            
+            app.mainDisplay.style.fontSize = "12vw";
+            
+            this.timerInterval = setInterval(() => {
+                const now = Date.now();
+                const remaining = Math.max(0, this.endTime - now);
+                const secondsLeft = (remaining / 1000).toFixed(1);
+
+                app.subDisplay.innerText = `TIME: ${secondsLeft}s // SCORE: ${this.score}`;
+                
+                if (remaining <= 0) {
+                    this.endGame(false); 
+                }
+            }, 100);
+
+            this.nextTurn();
+        },
+
+        nextTurn: function() {
+            const wordObj = this.colors[Math.floor(Math.random() * this.colors.length)];
+            this.currentMatch = Math.random() < 0.5;
+            
+            let colorObj;
+            if (this.currentMatch) {
+                colorObj = wordObj;
+            } else {
+                do {
+                    colorObj = this.colors[Math.floor(Math.random() * this.colors.length)];
+                } while (colorObj.name === wordObj.name);
+            }
+
+            app.mainDisplay.innerText = wordObj.name;
+            app.mainDisplay.className = `hero-text ${colorObj.class}`;
+        },
+
+        endGame: function(isWrongInput) {
+            this.state = 'ended';
+            clearInterval(this.timerInterval);
+
+            if (isWrongInput) {
+                this.score = 0;
+            }
+
+            app.mainDisplay.className = 'hero-text'; 
+
+            if (isWrongInput) {
+                app.gameLayer.className = 'active reflex-fail';
+                app.mainDisplay.style.color = 'var(--primary)'; 
+            } else {
+                app.gameLayer.className = 'active';
+                app.mainDisplay.style.color = 'var(--primary)';
+            }
+            
+            app.mainDisplay.innerText = isWrongInput ? "WRONG" : "DONE";
+            
+            if (isWrongInput) {
+                app.subDisplay.innerHTML = `<br>Space to Retry`;
+            } else {
+                app.subDisplay.innerHTML = `Final Score: <span class="text-accent">${this.score}</span><br><br>Space to Retry`;
+            }
         }
     };
 </script>
