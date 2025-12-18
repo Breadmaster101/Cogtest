@@ -256,15 +256,15 @@
             this.mainDisplay.style.opacity = ''; 
 
             if (gameType === 'perception') {
-                this.titleDisplay.innerText = "Chrono Sense // Stop on Target";
+                this.titleDisplay.innerText = "Chrono";
                 this.controlHint.innerHTML = `Use <span class="key-badge">↑</span> <span class="key-badge">↓</span> to Adjust Time • <span class="key-badge">SPACE</span> to Start`;
                 perceptionGame.init();
             } else if (gameType === 'reflex') {
-                this.titleDisplay.innerText = "Reflex Strike // Wait for Green";
+                this.titleDisplay.innerText = "Reflex";
                 this.controlHint.innerHTML = `Press <span class="key-badge">SPACE</span> to Action`;
                 reflexGame.init();
             } else if (gameType === 'focus') {
-                this.titleDisplay.innerText = "Signal Noise // Identify Target";
+                this.titleDisplay.innerText = "Signal";
                 this.controlHint.innerHTML = `Press <span class="key-badge">SPACE</span> on Match`;
                 focusGame.init();
             }
