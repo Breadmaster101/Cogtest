@@ -173,9 +173,9 @@
         .c-yellow { color: var(--warning) !important; }
         
         .hidden { display: none !important; }
-        .text-accent { color: var(--accent); }
-        .text-success { color: var(--success); }
-        .text-danger { color: var(--danger); }
+        .text-accent { color: var(--accent) !important; }
+        .text-success { color: var(--success) !important; }
+        .text-danger { color: var(--danger) !important; }
 
     </style>
 </head>
@@ -208,6 +208,13 @@
                 <div class="panel-icon">🧠</div>
                 <h2>Conflict</h2>
                 <p>INHIBITION</p>
+            </div>
+        </div>
+        <div class="menu-panel" onclick="app.loadGame('sequence')">
+            <div class="panel-content">
+                <div class="panel-icon">💠</div>
+                <h2>Sequence</h2>
+                <p>MEMORY SPAN</p>
             </div>
         </div>
     </div>
@@ -264,6 +271,10 @@
                 this.titleDisplay.innerText = "Conflict";
                 this.controlHint.innerHTML = `<span class="key-badge">←</span> NO • <span class="key-badge">→</span> YES • <span class="key-badge">SPACE</span> to Start`;
                 conflictGame.init();
+            } else if (gameType === 'sequence') {
+                this.titleDisplay.innerText = "Sequence";
+                this.controlHint.innerHTML = `Watch Pattern • Repeat with <span class="key-badge">ARROWS</span>`;
+                sequenceGame.init();
             }
         },
 
@@ -273,10 +284,12 @@
             clearTimeout(reflexGame.timeoutId);
             clearTimeout(focusGame.intervalId);
             clearInterval(conflictGame.timerInterval);
+            clearTimeout(sequenceGame.timeoutId);
             
             focusGame.state = 'idle';
             reflexGame.state = 'idle';
             conflictGame.state = 'idle';
+            sequenceGame.state = 'idle';
 
             this.gameLayer.classList.remove('active');
             
@@ -301,25 +314,29 @@
             if (app.currentContext === 'reflex') reflexGame.action();
             if (app.currentContext === 'focus') focusGame.action();
             if (app.currentContext === 'conflict') conflictGame.action();
+            if (app.currentContext === 'sequence') sequenceGame.action();
         }
 
-        if (e.code === 'ArrowUp') {
+        // Consolidated Arrow Key Handling
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
             e.preventDefault();
-            if (app.currentContext === 'perception') perceptionGame.adjustTime(1);
-        }
-        if (e.code === 'ArrowDown') {
-            e.preventDefault();
-            if (app.currentContext === 'perception') perceptionGame.adjustTime(-1);
-        }
-        if (e.code === 'ArrowLeft') {
-            e.preventDefault();
-            if (app.currentContext === 'perception') perceptionGame.adjustTime(-1);
-            if (app.currentContext === 'conflict') conflictGame.input(false);
-        }
-        if (e.code === 'ArrowRight') {
-            e.preventDefault();
-            if (app.currentContext === 'perception') perceptionGame.adjustTime(1);
-            if (app.currentContext === 'conflict') conflictGame.input(true);
+
+            // Perception Game Arrows
+            if (app.currentContext === 'perception') {
+                if (e.code === 'ArrowUp' || e.code === 'ArrowRight') perceptionGame.adjustTime(1);
+                if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') perceptionGame.adjustTime(-1);
+            }
+            
+            // Conflict Game Arrows
+            if (app.currentContext === 'conflict') {
+                if (e.code === 'ArrowLeft') conflictGame.input(false);
+                if (e.code === 'ArrowRight') conflictGame.input(true);
+            }
+
+            // Sequence Game Arrows
+            if (app.currentContext === 'sequence') {
+                sequenceGame.input(e.code);
+            }
         }
     });
 
@@ -672,6 +689,113 @@
             } else {
                 app.subDisplay.innerHTML = `Final Score: <span class="text-accent">${this.score}</span><br><br>Space to Retry`;
             }
+        }
+    };
+
+    const sequenceGame = {
+        state: 'idle', // idle, showing, input, ended
+        sequence: [],
+        userIndex: 0,
+        level: 1,
+        timeoutId: null,
+        
+        // Use rotation values instead of different characters to ensure identical size
+        arrows: {
+            'ArrowUp': '0deg',
+            'ArrowDown': '180deg',
+            'ArrowLeft': '-90deg',
+            'ArrowRight': '90deg'
+        },
+
+        init: function() {
+            this.state = 'idle';
+            this.level = 1;
+            app.gameLayer.className = 'active';
+            app.mainDisplay.innerText = "MEMORIZE";
+            app.mainDisplay.style.fontSize = "8vw";
+            app.subDisplay.innerText = "Press Space to Start";
+        },
+
+        action: function() {
+            if (this.state === 'idle') this.startLevel();
+            else if (this.state === 'ended') this.init();
+        },
+
+        startLevel: function() {
+            this.state = 'showing';
+            this.sequence = [];
+            this.userIndex = 0;
+            app.subDisplay.innerText = `LEVEL ${this.level}`;
+            
+            // Generate sequence
+            const keys = Object.keys(this.arrows);
+            for(let i=0; i < this.level + 2; i++) {
+                this.sequence.push(keys[Math.floor(Math.random() * keys.length)]);
+            }
+
+            this.playSequence(0);
+        },
+
+        playSequence: function(index) {
+            if (index >= this.sequence.length) {
+                app.mainDisplay.innerText = "?";
+                app.mainDisplay.className = 'hero-text text-accent';
+                this.state = 'input';
+                app.subDisplay.innerText = "REPEAT SEQUENCE";
+                return;
+            }
+
+            app.mainDisplay.innerText = "";
+            
+            this.timeoutId = setTimeout(() => {
+                const key = this.sequence[index];
+                const rotation = this.arrows[key];
+                
+                // Render identical character rotated
+                app.mainDisplay.innerHTML = `<span style="display:inline-block; transform: rotate(${rotation})">↑</span>`;
+                app.mainDisplay.className = 'hero-text';
+                
+                this.timeoutId = setTimeout(() => {
+                    this.playSequence(index + 1);
+                }, 600); 
+            }, 200); 
+        },
+
+        input: function(key) {
+            if (this.state !== 'input') return;
+
+            const rotation = this.arrows[key];
+            if (rotation) {
+                app.mainDisplay.innerHTML = `<span style="display:inline-block; transform: rotate(${rotation})">↑</span>`;
+            }
+
+            if (key === this.sequence[this.userIndex]) {
+                app.mainDisplay.className = 'hero-text text-success';
+                this.userIndex++;
+
+                if (this.userIndex >= this.sequence.length) {
+                    this.state = 'wait';
+                    this.level++;
+                    setTimeout(() => {
+                        app.mainDisplay.className = 'hero-text';
+                        this.startLevel();
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                         if(this.state === 'input') app.mainDisplay.className = 'hero-text';
+                    }, 100);
+                }
+            } else {
+                this.endGame();
+            }
+        },
+
+        endGame: function() {
+            this.state = 'ended';
+            app.gameLayer.className = 'active reflex-fail';
+            app.mainDisplay.innerText = "GAME OVER";
+            app.mainDisplay.className = 'hero-text'; 
+            app.subDisplay.innerHTML = `Max Level: <span class="text-accent">${this.level}</span><br><br>Space to Retry`;
         }
     };
 </script>
